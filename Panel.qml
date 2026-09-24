@@ -109,6 +109,10 @@ Panel {
     function actNewest(): string { return iphone.actOnNewest("negative") }
     function testCall(name: string): string { iphone.simulateCall(name); return "shown" }
     function testCallEnd(): string { iphone.clearSimulatedCall(); return "hidden" }
+    // Drive the dialog's own handlers, to separate a broken action path from
+    // a click that never lands.
+    function callAnswer(): string { iphone.answerCall(); return "answer: " + iphone.lastError }
+    function callDecline(): string { iphone.declineCall(); return "decline: " + iphone.lastError }
     function lastError(): string { return iphone.lastError }
     function focusOn(): string { iphone.setFocus(true); return "on" }
     function focusOff(): string { iphone.setFocus(false); return "off" }

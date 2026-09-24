@@ -60,193 +60,202 @@ Item {
     // Only the card accepts input; the rest of the screen stays clickable.
     mask: Region { item: card }
 
-    Item {
-      id: stage
-      anchors.fill: parent
+    Rectangle {
+      id: card
+      width: Math.min(Style.space(420), parent.width - Style.space(40))
+      implicitHeight: content.implicitHeight + Style.spacing.panelPadding * 2
+      height: implicitHeight
+      anchors.horizontalCenter: parent.horizontalCenter
+      y: Style.space(48)
 
-      Rectangle {
-        id: card
-        width: Math.min(Style.space(420), stage.width - Style.space(40))
-        implicitHeight: content.implicitHeight + Style.spacing.panelPadding * 2
-        height: implicitHeight
-        anchors.horizontalCenter: parent.horizontalCenter
-        y: Style.space(48)
+      radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(18)
+      color: Color.popups.background
+      border.width: Math.max(1, Style.space(1))
+      border.color: Color.popups.border
 
-        radius: Style.cornerRadius > 0 ? Style.cornerRadius : Style.space(18)
-        color: Color.popups.background
-        border.width: Math.max(1, Style.space(1))
-        border.color: Color.popups.border
+      // Entry: drop in and settle. Scale and opacity are driven from the
+      // same state so the card never appears half-formed.
+      opacity: 0
+      scale: 0.94
+      transformOrigin: Item.Top
 
-        // Entry: drop in and settle. Scale and opacity are driven from the
-        // same state so the card never appears half-formed.
-        opacity: 0
-        scale: 0.94
-        transformOrigin: Item.Top
+      states: State {
+        name: "shown"
+        when: root.active
+        PropertyChanges { target: card; opacity: 1; scale: 1.0; y: Style.space(64) }
+      }
 
-        states: State {
-          name: "shown"
-          when: root.active
-          PropertyChanges { target: card; opacity: 1; scale: 1.0; y: Style.space(64) }
-        }
-
-        transitions: [
-          Transition {
-            to: "shown"
-            NumberAnimation {
-              properties: "opacity,scale,y"
-              duration: 260
-              easing.type: Easing.OutBack
-              easing.overshoot: 0.8
-            }
-          },
-          Transition {
-            from: "shown"
-            NumberAnimation {
-              id: closeAnim
-              properties: "opacity,scale,y"
-              duration: 160
-              easing.type: Easing.InCubic
-            }
+      transitions: [
+        Transition {
+          to: "shown"
+          NumberAnimation {
+            properties: "opacity,scale,y"
+            duration: 260
+            easing.type: Easing.OutBack
+            easing.overshoot: 0.8
           }
-        ]
+        },
+        Transition {
+          from: "shown"
+          NumberAnimation {
+            id: closeAnim
+            properties: "opacity,scale,y"
+            duration: 160
+            easing.type: Easing.InCubic
+          }
+        }
+      ]
 
-        Keys.onEscapePressed: root.decline()
-        Keys.onReturnPressed: root.accept()
-        Keys.onEnterPressed: root.accept()
-        focus: root.active
+      Keys.onEscapePressed: root.decline()
+      Keys.onReturnPressed: root.accept()
+      Keys.onEnterPressed: root.accept()
+      focus: root.active
 
-        ColumnLayout {
-          id: content
-          anchors.left: parent.left
-          anchors.right: parent.right
-          anchors.verticalCenter: parent.verticalCenter
-          anchors.margins: Style.spacing.panelPadding
-          spacing: Style.spacing.xl
+      ColumnLayout {
+        id: content
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.verticalCenter: parent.verticalCenter
+        anchors.margins: Style.spacing.panelPadding
+        spacing: Style.spacing.xl
 
-          RowLayout {
-            Layout.fillWidth: true
-            spacing: Style.spacing.controlGap
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.spacing.controlGap
 
-            // Avatar with a slow pulse, so the card reads as "still ringing"
-            // without animating anything that carries meaning.
-            Item {
-              Layout.alignment: Qt.AlignVCenter
-              implicitWidth: Style.space(52)
-              implicitHeight: Style.space(52)
+          // Avatar with a slow pulse, so the card reads as "still ringing"
+          // without animating anything that carries meaning.
+          Item {
+            Layout.alignment: Qt.AlignVCenter
+            implicitWidth: Style.space(52)
+            implicitHeight: Style.space(52)
 
-              Rectangle {
-                id: pulse
-                anchors.centerIn: parent
-                width: parent.width
-                height: parent.height
-                radius: width / 2
-                color: "transparent"
-                border.width: Math.max(1, Style.space(2))
-                border.color: root.acceptColor
-                opacity: 0
+            Rectangle {
+              id: pulse
+              anchors.centerIn: parent
+              width: parent.width
+              height: parent.height
+              radius: width / 2
+              color: "transparent"
+              border.width: Math.max(1, Style.space(2))
+              border.color: root.acceptColor
+              opacity: 0
 
-                SequentialAnimation {
-                  running: root.active
-                  loops: Animation.Infinite
-                  ParallelAnimation {
-                    NumberAnimation { target: pulse; property: "scale"; from: 1.0; to: 1.35; duration: 1400; easing.type: Easing.OutCubic }
-                    SequentialAnimation {
-                      NumberAnimation { target: pulse; property: "opacity"; from: 0.0; to: 0.55; duration: 350 }
-                      NumberAnimation { target: pulse; property: "opacity"; from: 0.55; to: 0.0; duration: 1050 }
-                    }
+              SequentialAnimation {
+                running: root.active
+                loops: Animation.Infinite
+                ParallelAnimation {
+                  NumberAnimation { target: pulse; property: "scale"; from: 1.0; to: 1.35; duration: 1400; easing.type: Easing.OutCubic }
+                  SequentialAnimation {
+                    NumberAnimation { target: pulse; property: "opacity"; from: 0.0; to: 0.55; duration: 350 }
+                    NumberAnimation { target: pulse; property: "opacity"; from: 0.55; to: 0.0; duration: 1050 }
                   }
                 }
               }
+            }
 
-              Rectangle {
+            Rectangle {
+              anchors.centerIn: parent
+              width: Style.space(44)
+              height: Style.space(44)
+              radius: width / 2
+              color: Qt.rgba(root.acceptColor.r, root.acceptColor.g, root.acceptColor.b, 0.16)
+
+              Text {
                 anchors.centerIn: parent
-                width: Style.space(44)
-                height: Style.space(44)
-                radius: width / 2
-                color: Qt.rgba(root.acceptColor.r, root.acceptColor.g, root.acceptColor.b, 0.16)
-
-                Text {
-                  anchors.centerIn: parent
-                  text: ""
-                  color: root.acceptColor
-                  font.family: root.fontFamily
-                  font.pixelSize: Style.font.display
-                  textFormat: Text.PlainText
-                }
-              }
-            }
-
-            ColumnLayout {
-              Layout.fillWidth: true
-              spacing: Style.spacing.xxs
-
-              Text {
-                Layout.fillWidth: true
-                text: root.callerName
-                color: Color.popups.text
+                text: ""
+                color: root.acceptColor
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.title
-                font.bold: true
-                elide: Text.ElideRight
-                textFormat: Text.PlainText
-              }
-
-              Text {
-                Layout.fillWidth: true
-                text: root.callerDetail
-                color: Qt.darker(Color.popups.text, 1.5)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.bodySmall
-                elide: Text.ElideRight
-                textFormat: Text.PlainText
-              }
-
-              Text {
-                Layout.fillWidth: true
-                visible: root.service && root.service.deviceName !== ""
-                text: root.service ? root.service.deviceName : ""
-                color: Qt.darker(Color.popups.text, 1.9)
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-                elide: Text.ElideRight
+                font.pixelSize: Style.font.display
                 textFormat: Text.PlainText
               }
             }
           }
 
-          RowLayout {
+          ColumnLayout {
             Layout.fillWidth: true
-            spacing: Style.spacing.controlGap
+            spacing: Style.spacing.xxs
 
-            CallButton {
+            Text {
               Layout.fillWidth: true
-              accent: root.declineColor
-              // A hung-up handset is the phone glyph turned over; this avoids
-              // depending on a phone-slash glyph the font may not carry.
-              glyph: ""
-              glyphRotation: 135
-              label: root.active ? String(root.call.negativeAction || "Decline") : "Decline"
-              onTriggered: root.decline()
+              text: root.callerName
+              color: Color.popups.text
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.title
+              font.bold: true
+              elide: Text.ElideRight
+              textFormat: Text.PlainText
             }
 
-            CallButton {
+            Text {
               Layout.fillWidth: true
-              accent: root.acceptColor
-              glyph: ""
-              label: root.active ? String(root.call.positiveAction || "Answer") : "Answer"
-              onTriggered: root.accept()
+              text: root.callerDetail
+              color: Qt.darker(Color.popups.text, 1.5)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.bodySmall
+              elide: Text.ElideRight
+              textFormat: Text.PlainText
+            }
+
+            Text {
+              Layout.fillWidth: true
+              visible: root.service && root.service.deviceName !== ""
+              text: root.service ? root.service.deviceName : ""
+              color: Qt.darker(Color.popups.text, 1.9)
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              elide: Text.ElideRight
+              textFormat: Text.PlainText
             }
           }
+        }
 
-          Text {
+        RowLayout {
+          Layout.fillWidth: true
+          spacing: Style.spacing.controlGap
+
+          CallButton {
             Layout.fillWidth: true
-            horizontalAlignment: Text.AlignHCenter
-            text: "Enter to answer · Esc to decline"
-            color: Qt.darker(Color.popups.text, 2.1)
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            textFormat: Text.PlainText
+            accent: root.declineColor
+            // A hung-up handset is the phone glyph turned over; this avoids
+            // depending on a phone-slash glyph the font may not carry.
+            glyph: ""
+            glyphRotation: 135
+            label: root.active ? String(root.call.negativeAction || "Decline") : "Decline"
+            onTriggered: root.decline()
           }
+
+          CallButton {
+            Layout.fillWidth: true
+            accent: root.acceptColor
+            glyph: ""
+            label: root.active ? String(root.call.positiveAction || "Answer") : "Answer"
+            onTriggered: root.accept()
+          }
+        }
+
+        // If an action is refused, say so on the card itself: the panel is not
+        // where you are looking while a call is ringing.
+        Text {
+          Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+          visible: root.service && root.service.lastError !== ""
+          text: root.service ? root.service.lastError : ""
+          color: root.declineColor
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          wrapMode: Text.WordWrap
+          textFormat: Text.PlainText
+        }
+
+        Text {
+          Layout.fillWidth: true
+          horizontalAlignment: Text.AlignHCenter
+          text: "Enter to answer · Esc to decline"
+          color: Qt.darker(Color.popups.text, 2.1)
+          font.family: root.fontFamily
+          font.pixelSize: Style.font.caption
+          textFormat: Text.PlainText
         }
       }
     }

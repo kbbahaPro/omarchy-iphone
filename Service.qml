@@ -59,6 +59,9 @@ Item {
   // removes the notification the moment the call ends, which closes the
   // dialog on its own.
   property int _handledCallId: 0
+  // Remembered from the most recent notification, so a simulated call can use
+  // the real BlueZ path instead of an empty handle that invoke() drops.
+  property string _lastDeviceHandle: ""
   readonly property var activeCall: {
     for (var i = 0; i < items.length; i++) {
       var e = items[i]
@@ -117,6 +120,9 @@ Item {
 
     if (event.type === "history") {
       items = Model.sortNewestFirst(event.items || [], historyLimit)
+      for (var h = 0; h < items.length; h++) {
+        if (items[h].deviceHandle) { _lastDeviceHandle = String(items[h].deviceHandle); break }
+      }
       return
     }
     if (event.type === "status") {
@@ -201,6 +207,7 @@ Item {
     for (var i = 0; i < items.length; i++) {
       if (items[i].id === entry.id) { known = true; break }
     }
+    if (entry.deviceHandle) _lastDeviceHandle = String(entry.deviceHandle)
     var session = Number(entry.session || 0)
     if (session !== 0 && session !== currentSession) currentSession = session
     items = Model.upsert(items, entry, historyLimit)
@@ -298,7 +305,7 @@ Item {
       subtitle: "",
       body: "mobile",
       deviceName: deviceName,
-      deviceHandle: "",
+      deviceHandle: _lastDeviceHandle,
       positiveAction: "Answer",
       negativeAction: "Decline",
       category: 1,
@@ -320,16 +327,16 @@ Item {
   function answerCall() {
     var c = activeCall
     if (!c) return
+    if (!invoke(c, "positive")) return
     _handledCallId = c.id
-    invoke(c, "positive")
   }
 
   function declineCall() {
     var c = activeCall
     if (!c) return
+    if (!invoke(c, "negative")) return
     _handledCallId = c.id
     items = Model.removeById(items, c.id)
-    invoke(c, "negative")
   }
 
   function setFocus(on) {
@@ -376,12 +383,19 @@ Item {
   // drop the rest.
   property var _actionQueue: []
 
+  // Returns true when the action was accepted and queued. Callers use this to
+  // decide whether to optimistically remove the row: closing the card for an
+  // action that never fired is indistinguishable from it working.
   function invoke(entry, kind) {
-    if (!entry || !entry.deviceHandle) return
+    if (!entry) return false
+    if (!entry.deviceHandle) {
+      lastError = "No device handle — cannot act on this notification"
+      return false
+    }
     if (!Model.isActionable(entry, currentSession)) {
       // Fail loudly: the write would otherwise succeed and do nothing.
       lastError = "Too old to act on — the phone reconnected since this arrived"
-      return
+      return false
     }
     var queue = _actionQueue.slice()
     queue.push([
@@ -392,6 +406,7 @@ Item {
     ])
     _actionQueue = queue
     pumpActions()
+    return true
   }
 
   // Exercised from IPC to prove whether the panel's action path reaches the
