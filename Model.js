@@ -221,3 +221,41 @@ function isUrgent(entry) {
   var id = Number(entry.category || 0)
   return entry.important === true || id === 1 || id === 2 || id === 3
 }
+
+// --- threading ----------------------------------------------------------
+//
+// A flat list is unreadable once one person sends five messages. Group by
+// sender within an app: for Messenger and Messages the title *is* the sender.
+
+function threadItems(items) {
+  var out = []
+  var index = {}
+  for (var i = 0; i < items.length; i++) {
+    var e = items[i]
+    var key = String(e.appId || "") + "|" + String(e.title || "")
+    if (index[key] === undefined) {
+      index[key] = out.length
+      // items arrive newest-first, so the first one seen is the latest.
+      out.push({ key: key, latest: e, count: 1, ids: [e.id] })
+    } else {
+      var g = out[index[key]]
+      g.count += 1
+      g.ids.push(e.id)
+    }
+  }
+  return out
+}
+
+// iOS reports how many notifications sit in each category on the phone.
+// Taking the most recent count per category approximates what is still
+// waiting over there, as opposed to what we have seen here.
+function phonePending(items) {
+  var latest = {}
+  for (var i = 0; i < items.length; i++) {
+    var c = Number(items[i].category || 0)
+    if (latest[c] === undefined) latest[c] = Number(items[i].categoryCount || 0)
+  }
+  var total = 0
+  for (var k in latest) total += latest[k]
+  return total
+}

@@ -356,6 +356,20 @@ Panel {
               fontFamily: root.fontFamily
             }
 
+            // What iOS says is still queued on the device, as opposed to what
+            // we have collected here.
+            Text {
+              anchors.left: sectionHeader.right
+              anchors.leftMargin: Style.spacing.sm
+              anchors.verticalCenter: parent.verticalCenter
+              visible: iphone.phonePending > 0
+              text: "· " + iphone.phonePending + " on phone"
+              color: root.dim
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption
+              textFormat: Text.PlainText
+            }
+
             Button {
               id: clearButton
               anchors.right: parent.right
@@ -385,17 +399,26 @@ Panel {
           }
 
           Repeater {
-            model: iphone.items
+            model: iphone.threads
 
             Item {
               id: row
               required property var modelData
+              readonly property var entry: modelData.latest
               required property int index
 
               width: column.width
               implicitHeight: rowLayout.implicitHeight + Style.spacing.md * 2
 
               readonly property bool hasCursor: root.cursorActive && root.selectedIndex === index
+
+              // Urgent rows carry a faint tint so calls stand out in a long list.
+              Rectangle {
+                anchors.fill: parent
+                visible: Model.isUrgent(row.entry)
+                color: root.urgent
+                opacity: 0.10
+              }
 
               CursorSurface {
                 anchors.fill: parent
@@ -411,7 +434,7 @@ Panel {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 onEntered: { root.cursorActive = true; root.selectedIndex = row.index }
                 onClicked: function (mouse) {
-                  if (mouse.button === Qt.RightButton) iphone.dismiss(row.modelData)
+                  if (mouse.button === Qt.RightButton) iphone.dismissThread(row.modelData)
                 }
               }
 
@@ -426,7 +449,7 @@ Panel {
 
                 Text {
                   Layout.alignment: Qt.AlignTop
-                  text: Model.glyphFor(row.modelData)
+                  text: Model.glyphFor(row.entry)
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.icon
@@ -442,7 +465,17 @@ Panel {
                     spacing: Style.spacing.sm
 
                     Text {
-                      text: Model.displayAppName(row.modelData)
+                      visible: row.modelData.count > 1
+                      text: "×" + row.modelData.count
+                      color: root.foreground
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
+                      font.bold: true
+                      textFormat: Text.PlainText
+                    }
+
+                    Text {
+                      text: Model.displayAppName(row.entry)
                       color: root.foreground
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
@@ -452,8 +485,8 @@ Panel {
 
                     Text {
                       visible: text !== ""
-                      text: Model.categoryLabel(row.modelData)
-                      color: Model.isUrgent(row.modelData) ? root.urgent : root.dim
+                      text: Model.categoryLabel(row.entry)
+                      color: Model.isUrgent(row.entry) ? root.urgent : root.dim
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                       textFormat: Text.PlainText
@@ -462,7 +495,7 @@ Panel {
                     Item { Layout.fillWidth: true }
 
                     Text {
-                      text: Model.relativeTime(row.modelData.ts, root.nowMs)
+                      text: Model.relativeTime(row.entry.ts, root.nowMs)
                       color: root.dim
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
@@ -472,8 +505,8 @@ Panel {
 
                   Text {
                     Layout.fillWidth: true
-                    visible: String(row.modelData.title || "") !== ""
-                    text: String(row.modelData.title || "")
+                    visible: String(row.entry.title || "") !== ""
+                    text: String(row.entry.title || "")
                     color: root.foreground
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.bodySmall
@@ -485,8 +518,8 @@ Panel {
 
                   Text {
                     Layout.fillWidth: true
-                    visible: String(row.modelData.body || "") !== ""
-                    text: String(row.modelData.body || "")
+                    visible: String(row.entry.body || "") !== ""
+                    text: String(row.entry.body || "")
                     color: root.dim
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.bodySmall
@@ -501,23 +534,23 @@ Panel {
                 // only ever offers these two, so there is nothing else to show.
                 PanelActionButton {
                   Layout.alignment: Qt.AlignVCenter
-                  visible: row.modelData.positiveAction !== undefined
-                           && row.modelData.positiveAction !== null
+                  visible: row.entry.positiveAction !== undefined
+                           && row.entry.positiveAction !== null
                   iconText: ""
-                  tooltipText: String(row.modelData.positiveAction || "Accept")
+                  tooltipText: String(row.entry.positiveAction || "Accept")
                   foreground: root.foreground
                   fontFamily: root.fontFamily
-                  onClicked: iphone.accept(row.modelData)
+                  onClicked: iphone.accept(row.entry)
                 }
 
                 PanelActionButton {
                   Layout.alignment: Qt.AlignVCenter
                   iconText: ""
-                  tooltipText: String(row.modelData.negativeAction || "Dismiss on phone")
+                  tooltipText: String(row.entry.negativeAction || "Dismiss on phone")
                   foreground: root.foreground
                   hoverColor: root.urgent
                   fontFamily: root.fontFamily
-                  onClicked: iphone.dismiss(row.modelData)
+                  onClicked: iphone.dismissThread(row.modelData)
                 }
               }
             }

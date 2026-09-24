@@ -36,6 +36,9 @@ Item {
   // --- Apple Media Service (now playing over the same BLE link) ---
   // Focus mode: everything stays silent except the VIP list, so deep work is
   // protected without the fear of missing the one call that matters.
+  // True once we have actually seen the phone, so a shell restart while the
+  // phone is away can never trigger a lock on its own.
+  property bool _everConnected: false
   property bool focusMode: false
   property string lastCode: ""
 
@@ -49,6 +52,8 @@ Item {
   readonly property bool hasNowPlaying: amsAvailable && (npTitle !== "" || npArtist !== "")
 
   readonly property bool ready: observerUp
+  readonly property var threads: Model.threadItems(items)
+  readonly property int phonePending: Model.phonePending(items)
   readonly property bool batteryKnown: connected && phoneBattery >= 0
   readonly property bool batteryLow: batteryKnown && phoneBattery <= 20
   readonly property string statusText: {
@@ -81,6 +86,15 @@ Item {
   readonly property var vipApps: Model.normalizeList(setting("vipApps", ""))
   readonly property bool autoCopyCodes: setting("autoCopyCodes", true) === true
 
+  // Lock the desktop when the phone walks away. Off by default: it is a big
+  // behavioural change, and getting it wrong locks you out repeatedly.
+  readonly property bool proximityLock: setting("proximityLock", false) === true
+  readonly property int proximityLockDelay: {
+    var n = parseInt(String(setting("proximityLockDelay", 60)), 10)
+    if (!isFinite(n)) n = 60
+    return Math.max(10, Math.min(900, n))
+  }
+
   // --- incoming events -------------------------------------------------
   function handleLine(line) {
     var event = Model.parseLine(line)
@@ -93,8 +107,11 @@ Item {
     if (event.type === "status") {
       observerUp = event.observer === true
       daemonInstalled = event.installed === true
+      var wasConnected = connected
       connected = event.connected === true
+      if (connected) _everConnected = true
       deviceName = String(event.deviceName || "")
+      if (wasConnected !== connected) onPresenceChanged(connected)
       phoneBattery = event.battery === undefined ? -1 : Number(event.battery)
       if (observerUp) lastError = ""
       // A phone that has actually connected makes the advertising banner
@@ -150,6 +167,20 @@ Item {
     amsCommandProcess.running = true
   }
 
+  // ANCS category 1. A call is the one notification you cannot deal with later.
+  function handleIncomingCall(entry) {
+    mediaPauseProcess.command = [pluginDir + "bin/omarchy-iphone-media", "pause-all"]
+    mediaPauseProcess.running = true
+
+    var who = String(entry.title || "").trim()
+    callToastProcess.command = [
+      "notify-send", "-a", "iPhone", "-u", "critical", "--",
+      "Incoming call" + (who !== "" ? " — " + who : ""),
+      String(entry.body || "Answer or decline from the panel")
+    ]
+    callToastProcess.running = true
+  }
+
   function receive(entry) {
     var known = false
     for (var i = 0; i < items.length; i++) {
@@ -159,6 +190,12 @@ Item {
     // An ANCS "modified" resend of a notification already on screen should
     // not bump the badge a second time.
     if (!known) unread = unread + 1
+
+    // Calls bypass every other rule, including focus mode and the silent flag.
+    if (Number(entry.category || 0) === 1 && entry.preexisting !== true) {
+      handleIncomingCall(entry)
+      return
+    }
 
     // Login codes are worth acting on even in focus mode: you only ever see
     // one because you just asked for it.
@@ -191,6 +228,42 @@ Item {
       "--", "Code " + code + " copied", "Paste it with Ctrl+V"
     ]
     codeToastProcess.running = true
+  }
+
+  // --- proximity lock ---------------------------------------------------
+
+  function onPresenceChanged(nowConnected) {
+    if (!proximityLock || !_everConnected) return
+
+    if (nowConnected) {
+      if (proximityTimer.running) {
+        proximityTimer.stop()
+        notify("iPhone back in range", "Lock cancelled")
+      }
+      return
+    }
+
+    // A brief BLE drop is common, so warn and wait rather than locking at once.
+    proximityTimer.interval = proximityLockDelay * 1000
+    proximityTimer.restart()
+    notify("iPhone out of range",
+           "Locking in " + proximityLockDelay + "s unless it comes back")
+  }
+
+  function notify(title, body) {
+    notifyProcess.command = ["notify-send", "-a", "iPhone", "--", title, body]
+    notifyProcess.running = true
+  }
+
+  Timer {
+    id: proximityTimer
+    repeat: false
+    onTriggered: {
+      // Re-check: the phone may have returned between the last signal and now.
+      if (!root.proximityLock || root.connected) return
+      lockProcess.command = ["omarchy", "system", "lock"]
+      lockProcess.running = true
+    }
   }
 
   function setFocus(on) {
@@ -254,6 +327,18 @@ Item {
     if (!entry) return
     items = Model.removeById(items, entry.id)
     invoke(entry, "positive")
+  }
+
+  // Dismissing a thread clears every message in it, here and on the phone.
+  function dismissThread(group) {
+    if (!group) return
+    var ids = group.ids || []
+    var remaining = []
+    for (var i = 0; i < items.length; i++) {
+      if (ids.indexOf(items[i].id) === -1) remaining.push(items[i])
+      else invoke(items[i], "negative")
+    }
+    items = remaining
   }
 
   function clearAll() {
@@ -327,6 +412,10 @@ Item {
 
   Process { id: amsCommandProcess; running: false; command: [] }
   Process { id: copyProcess; running: false; command: [] }
+  Process { id: notifyProcess; running: false; command: [] }
+  Process { id: mediaPauseProcess; running: false; command: [] }
+  Process { id: callToastProcess; running: false; command: [] }
+  Process { id: lockProcess; running: false; command: [] }
   Process { id: codeToastProcess; running: false; command: [] }
   Process { id: focusToastProcess; running: false; command: [] }
   Process { id: toastProcess; running: false; command: [] }

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Pause every MPRIS player on the desktop.
+#
+# Used when the phone reports an incoming call: you should be able to hear it
+# and think, rather than fumbling for whatever was playing.
+set -uo pipefail
+
+case "${1:-pause-all}" in
+  pause-all)
+    busctl --user list --no-legend 2>/dev/null \
+      | awk '{print $1}' \
+      | grep '^org\.mpris\.MediaPlayer2\.' \
+      | while read -r name; do
+          busctl --user call "$name" /org/mpris/MediaPlayer2 \
+            org.mpris.MediaPlayer2.Player Pause >/dev/null 2>&1
+        done
+    ;;
+  *)
+    echo "usage: omarchy-iphone-media pause-all" >&2
+    exit 1
+    ;;
+esac

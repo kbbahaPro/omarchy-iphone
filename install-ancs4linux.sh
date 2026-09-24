@@ -104,9 +104,13 @@ install -m 644 "$SRC/autorun/ancs4linux-advertising.service" /usr/lib/systemd/sy
 systemctl daemon-reload
 systemctl reload dbus.service 2>/dev/null || systemctl reload dbus-broker.service 2>/dev/null || true
 
-echo "==> Enabling and starting services"
-systemctl enable --now ancs4linux-observer.service
-systemctl enable --now ancs4linux-advertising.service
+echo "==> Enabling and restarting services"
+systemctl enable ancs4linux-observer.service
+systemctl enable ancs4linux-advertising.service
+# restart, not "enable --now": --now only starts an inactive unit, so
+# reinstalling over a running daemon would silently keep the old code.
+systemctl restart ancs4linux-observer.service
+systemctl restart ancs4linux-advertising.service
 
 sleep 2
 systemctl --no-pager --lines=5 status ancs4linux-observer.service || true

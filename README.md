@@ -311,3 +311,43 @@ raise a `critical` toast and pierce focus mode without being on the VIP list.
 
 If the patch ever fails to apply against a newer ancs4linux, the installer says
 so and continues; the plugin degrades to the fields upstream provides.
+
+---
+
+## Proximity lock
+
+Locks the desktop when the iPhone leaves Bluetooth range, and cancels if it
+comes back in time. **Off by default** — it is a large behavioural change, and
+a short BLE dropout should not cost you your session.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `proximityLock` | `false` | Enable it |
+| `proximityLockDelay` | `60` | Seconds to wait before locking |
+
+You get a warning toast when the countdown starts and another if it is
+cancelled. The lock never fires unless the phone has actually been seen this
+session, so restarting the shell while the phone is away cannot lock you out.
+
+## Incoming calls
+
+ANCS category `1` is handled specially, because a call is the one notification
+you cannot deal with later:
+
+- every MPRIS player on the desktop is paused, so you can hear it and think
+- a `critical` toast names the caller
+- the row is tinted in the panel
+
+Calls bypass focus mode and the Silent flag entirely. Voicemail and missed
+calls are treated as urgent too, and get their own glyph.
+
+## Threading
+
+Notifications are grouped by sender within each app — for Messenger and
+Messages the title *is* the sender — so seven messages from one person are one
+row marked `×7` rather than seven. Dismissing the row clears the whole thread,
+here and on the phone.
+
+The section header also shows how many notifications iOS says are still
+queued on the device, which is a different number from what you have
+collected here.

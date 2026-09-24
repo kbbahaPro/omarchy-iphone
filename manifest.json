@@ -24,7 +24,9 @@
       "mutedApps": "",
       "advertiseName": "Omarchy",
       "vipApps": "",
-      "autoCopyCodes": true
+      "autoCopyCodes": true,
+      "proximityLock": false,
+      "proximityLockDelay": 60
     },
     "schema": [
       {
@@ -71,6 +73,23 @@
         "label": "Pairing name",
         "defaultValue": "Omarchy",
         "description": "The name this machine shows under Bluetooth on your iPhone while pairing."
+      },
+      {
+        "key": "proximityLock",
+        "type": "boolean",
+        "label": "Lock desktop when phone leaves",
+        "defaultValue": false,
+        "description": "Lock the screen when the iPhone goes out of Bluetooth range. You get a warning toast first, and returning in time cancels it."
+      },
+      {
+        "key": "proximityLockDelay",
+        "type": "integer",
+        "label": "Grace period (seconds)",
+        "min": 10,
+        "max": 900,
+        "step": 10,
+        "defaultValue": 60,
+        "description": "How long to wait after the phone disappears before locking. Short BLE dropouts are common, so don't set this too low."
       }
     ]
   },
