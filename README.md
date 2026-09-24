@@ -19,6 +19,62 @@ no cloud account, nothing leaves the machine.
   Disturb and styling apply.
 - History kept across restarts, capped (200 by default).
 
+## Install
+
+```bash
+omarchy plugin add https://github.com/kbbahaPro/omarchy-iphone.git --enable
+```
+
+The widget appears immediately, but it needs a system daemon to talk to the
+phone. **Read `install-ancs4linux.sh` before running it** — it installs
+system services as root:
+
+```bash
+sudo ~/.config/omarchy/plugins/io.github.kbbahapro.iphone/install-ancs4linux.sh
+```
+
+It installs `python-dasbus` and `python-typer` from the official repos, puts
+[ancs4linux](https://github.com/pzmarzly/ancs4linux) in `/opt`, writes a D-Bus
+policy and two systemd units, and starts them. Nothing runs automatically —
+until you run it, the panel simply says "Setup needed" and shows the command.
+
+Then pair the phone (see [Pairing](#pairing)).
+
+## Uninstall
+
+Remove the plugin:
+
+```bash
+omarchy plugin remove io.github.kbbahapro.iphone
+```
+
+Remove the system daemon, if you want it gone too:
+
+```bash
+sudo systemctl disable --now ancs4linux-observer ancs4linux-advertising
+sudo rm -rf /opt/ancs4linux \
+            /usr/local/bin/ancs4linux-observer \
+            /usr/local/bin/ancs4linux-advertising \
+            /usr/local/bin/ancs4linux-ctl \
+            /usr/lib/systemd/system/ancs4linux-observer.service \
+            /usr/lib/systemd/system/ancs4linux-advertising.service \
+            /etc/dbus-1/system.d/ancs4linux-observer.conf \
+            /etc/dbus-1/system.d/ancs4linux-advertising.conf \
+            /etc/dbus-1/system.d/ancs4linux-omarchy-user.conf
+sudo groupdel ancs4linux
+sudo systemctl daemon-reload
+```
+
+Stored notification history:
+
+```bash
+rm -rf ~/.local/state/omarchy/iphone
+```
+
+`python-dasbus` and `python-typer` are ordinary repo packages and are left in
+place; remove them with `pacman -Rs` if nothing else needs them. Finally,
+forget the pairing on the phone: Settings → Bluetooth → ⓘ → Forget This Device.
+
 ## Architecture
 
 ```
