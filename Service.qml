@@ -55,6 +55,18 @@ Item {
   readonly property bool hasNowPlaying: amsAvailable && (npTitle !== "" || npArtist !== "")
 
   readonly property bool ready: observerUp
+  // The call currently ringing, if any. items are newest-first, and the phone
+  // removes the notification the moment the call ends, which closes the
+  // dialog on its own.
+  property int _handledCallId: 0
+  readonly property var activeCall: {
+    for (var i = 0; i < items.length; i++) {
+      var e = items[i]
+      if (Number(e.category || 0) === 1 && e.id !== _handledCallId) return e
+    }
+    return null
+  }
+
   readonly property var threads: Model.threadItems(items)
   readonly property int phonePending: Model.phonePending(items)
   readonly property bool batteryKnown: connected && phoneBattery >= 0
@@ -269,6 +281,55 @@ Item {
       lockProcess.command = ["omarchy", "system", "lock"]
       lockProcess.running = true
     }
+  }
+
+  // Answering and declining hide the dialog at once rather than waiting for
+  // the phone to confirm: the action is irreversible either way, and a card
+  // that lingers after the click feels broken.
+  // Preview the call dialog without waiting for someone to ring you. The
+  // entry carries the current session so the buttons behave exactly as they
+  // would for a real call; acting on it is a harmless no-op on the phone.
+  function simulateCall(name) {
+    var fake = {
+      id: -1,
+      appId: "com.apple.mobilephone",
+      appName: "Phone",
+      title: String(name || "Test Caller"),
+      subtitle: "",
+      body: "mobile",
+      deviceName: deviceName,
+      deviceHandle: "",
+      positiveAction: "Answer",
+      negativeAction: "Decline",
+      category: 1,
+      categoryCount: 1,
+      silent: false,
+      important: true,
+      preexisting: false,
+      session: currentSession,
+      ts: Date.now() / 1000
+    }
+    _handledCallId = 0
+    items = Model.upsert(items, fake, historyLimit)
+  }
+
+  function clearSimulatedCall() {
+    items = Model.removeById(items, -1)
+  }
+
+  function answerCall() {
+    var c = activeCall
+    if (!c) return
+    _handledCallId = c.id
+    invoke(c, "positive")
+  }
+
+  function declineCall() {
+    var c = activeCall
+    if (!c) return
+    _handledCallId = c.id
+    items = Model.removeById(items, c.id)
+    invoke(c, "negative")
   }
 
   function setFocus(on) {

@@ -80,6 +80,13 @@ Panel {
     pluginDir: root.pluginDir
   }
 
+  // Its own layer-shell surface: a ringing call should not require finding
+  // and opening the bar panel first.
+  CallDialog {
+    service: iphone
+    bar: root.bar
+  }
+
   // Relative timestamps go stale while the panel sits open.
   Timer {
     interval: 30000
@@ -100,6 +107,8 @@ Panel {
     // Diagnostic: run the exact action path the panel buttons use, against
     // the newest notification, and report what the service saw.
     function actNewest(): string { return iphone.actOnNewest("negative") }
+    function testCall(name: string): string { iphone.simulateCall(name); return "shown" }
+    function testCallEnd(): string { iphone.clearSimulatedCall(); return "hidden" }
     function lastError(): string { return iphone.lastError }
     function focusOn(): string { iphone.setFocus(true); return "on" }
     function focusOff(): string { iphone.setFocus(false); return "off" }

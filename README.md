@@ -351,3 +351,35 @@ here and on the phone.
 The section header also shows how many notifications iOS says are still
 queued on the device, which is a different number from what you have
 collected here.
+
+---
+
+## Incoming-call dialog
+
+A ringing call gets its own layer-shell surface (`omarchy-iphone-call`, on the
+overlay layer) rather than a row buried in the bar panel — you should not have
+to go looking for a call that is actionable for seconds.
+
+- Caller name, detail line, and which device it came from
+- **Decline** (red) and **Answer** (green), labelled with the actions iOS
+  actually sent
+- `Enter` answers, `Esc` declines
+- The card drops in with a slight overshoot; the avatar ring pulses while it
+  rings
+- Closes by itself when the phone withdraws the notification, so a call
+  answered on the handset dismisses it here too
+
+Only the card takes input (`mask: Region`), so the rest of the screen stays
+clickable while it is up.
+
+Chrome follows Omarchy's theme tokens, so it matches whatever theme is set.
+The two action colours are deliberately *not* themed: red and green for
+decline and answer are near-universal, and a themed pair would be ambiguous
+at the exact moment you need to read it fast.
+
+Preview it without waiting for a call:
+
+```bash
+omarchy-shell io.github.kbbahapro.iphone testCall "Jane Doe"
+omarchy-shell io.github.kbbahapro.iphone testCallEnd
+```
