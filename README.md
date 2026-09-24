@@ -1,7 +1,11 @@
-# iPhone for Omarchy
+# iPhone Bridge
 
-Mirror iPhone notifications into the Omarchy bar, so you can work without
-picking the phone up.
+Your iPhone's notifications, music and battery in the Omarchy bar, so you can
+work without picking the phone up.
+
+Dismiss a notification here and it clears on the phone. Skip a track without
+routing audio through the desktop. Login codes land on your clipboard by
+themselves. Focus mode silences everything except the people you choose.
 
 It uses **ANCS** (Apple Notification Center Service) — the same Bluetooth LE
 protocol an Apple Watch or a Garmin uses. No jailbreak, no app on the phone,

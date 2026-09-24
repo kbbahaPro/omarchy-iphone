@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "io.github.kbbahapro.iphone",
-  "name": "iPhone",
+  "name": "iPhone Bridge",
   "version": "1.0.0",
   "author": "kbbahaPro",
   "license": "MIT",
@@ -13,7 +13,7 @@
     "barWidget": "Panel.qml"
   },
   "barWidget": {
-    "displayName": "iPhone",
+    "displayName": "iPhone Bridge",
     "description": "iPhone notifications in the bar: unread badge, scrollable history, and dismiss straight from the desktop.",
     "category": "Devices",
     "allowMultiple": false,
