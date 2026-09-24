@@ -232,7 +232,14 @@ function threadItems(items) {
   var index = {}
   for (var i = 0; i < items.length; i++) {
     var e = items[i]
-    var key = String(e.appId || "") + "|" + String(e.title || "")
+    // Calls must never thread. An incoming call and the missed call the phone
+    // raises moments later share an app and a title, so grouping merged them
+    // into one row whose actions silently flipped from Answer/Decline to
+    // Dial/Clear — clicking "answer" would place a new call instead.
+    var cat = Number(e.category || 0)
+    var key = (cat === 1 || cat === 2 || cat === 3)
+      ? "call|" + String(e.id)
+      : String(e.appId || "") + "|" + String(e.title || "")
     if (index[key] === undefined) {
       index[key] = out.length
       // items arrive newest-first, so the first one seen is the latest.
@@ -243,7 +250,14 @@ function threadItems(items) {
       g.ids.push(e.id)
     }
   }
-  return out
+  // A ringing call is the only thing worth interrupting the ordering for:
+  // it is actionable for seconds, not hours, so it goes to the top.
+  var ringing = [], rest = []
+  for (var j = 0; j < out.length; j++) {
+    if (Number(out[j].latest.category || 0) === 1) ringing.push(out[j])
+    else rest.push(out[j])
+  }
+  return ringing.concat(rest)
 }
 
 // iOS reports how many notifications sit in each category on the phone.

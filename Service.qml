@@ -304,14 +304,31 @@ Item {
   }
 
   // --- outgoing actions -------------------------------------------------
+  // Actions are queued rather than fired straight at the Process: assigning
+  // `command` and re-setting `running` on a Process that is already running
+  // is a no-op, so dismissing a thread used to send one action and silently
+  // drop the rest.
+  property var _actionQueue: []
+
   function invoke(entry, kind) {
     if (!entry || !entry.deviceHandle) return
-    actionProcess.command = [
+    var queue = _actionQueue.slice()
+    queue.push([
       bridgePath, "invoke",
       "--handle", String(entry.deviceHandle),
       "--id", String(entry.id),
       "--kind", kind
-    ]
+    ])
+    _actionQueue = queue
+    pumpActions()
+  }
+
+  function pumpActions() {
+    if (actionProcess.running || _actionQueue.length === 0) return
+    var queue = _actionQueue.slice()
+    var next = queue.shift()
+    _actionQueue = queue
+    actionProcess.command = next
     actionProcess.running = true
   }
 
@@ -426,6 +443,19 @@ Item {
     running: false
     command: []
     stdout: SplitParser { onRead: function (line) { root.handleLine(line) } }
+    stderr: SplitParser {
+      onRead: function (line) {
+        var text = String(line || "").trim()
+        // Surface failures instead of swallowing them: the daemon silently
+        // ignores an action whose device handle it does not recognise.
+        if (text !== "") root.lastError = text
+      }
+    }
+    onExited: function (exitCode) {
+      if (exitCode !== 0 && root.lastError === "")
+        root.lastError = "Notification action failed"
+      root.pumpActions()
+    }
   }
 
   Process {
