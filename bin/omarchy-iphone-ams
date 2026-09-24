@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Apple Media Service (AMS) client for the Omarchy iPhone plugin.
+
+AMS is the BLE counterpart to ANCS: it carries what the phone is playing and
+accepts transport commands. It rides the same BLE link as notifications, so
+it keeps working when the phone is not connected as a Bluetooth audio source
+(which is when AVRCP/MPRIS gives us nothing).
+
+    listen              stream now-playing state as JSON lines
+    command <name>      play|pause|toggle|next|prev|volup|voldown
+
+Protocol reference: Apple's AppleMediaService_Reference.
+"""
+
+import argparse
+import json
+import sys
+
+import gi
+
+gi.require_version("GLib", "2.0")
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib  # noqa: E402
+
+AMS_SERVICE = "89d3502b-0f36-433a-8ef4-c502ad55f8dc"
+CHAR_REMOTE_COMMAND = "9b3c81d8-57b1-4a8a-b8df-0e56f7ca51c2"
+CHAR_ENTITY_UPDATE = "2f7cabce-808d-411f-9a0c-bb92ba96c102"
+
+# Entity ids, and the attributes we care about for each.
+ENTITY_PLAYER, ENTITY_QUEUE, ENTITY_TRACK = 0, 1, 2
+PLAYER_NAME, PLAYER_PLAYBACK_INFO, PLAYER_VOLUME = 0, 1, 2
+TRACK_ARTIST, TRACK_ALBUM, TRACK_TITLE, TRACK_DURATION = 0, 1, 2, 3
+
+SUBSCRIPTIONS = [
+    (ENTITY_PLAYER, [PLAYER_NAME, PLAYER_PLAYBACK_INFO, PLAYER_VOLUME]),
+    (ENTITY_TRACK, [TRACK_ARTIST, TRACK_ALBUM, TRACK_TITLE, TRACK_DURATION]),
+]
+
+COMMANDS = {
+    "play": 0, "pause": 1, "toggle": 2, "next": 3, "prev": 4,
+    "previous": 4, "volup": 5, "voldown": 6,
+}
+
+TRACK_KEYS = {
+    TRACK_ARTIST: "artist", TRACK_ALBUM: "album",
+    TRACK_TITLE: "title", TRACK_DURATION: "duration",
+}
+PLAYBACK_STATES = {0: "paused", 1: "playing", 2: "rewinding", 3: "forwarding"}
+
+
+def emit(obj):
+    sys.stdout.write(json.dumps(obj, ensure_ascii=False) + "\n")
+    sys.stdout.flush()
+
+
+def system_bus():
+    return Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+
+
+def find_chars(bus):
+    """Locate the AMS characteristic paths on whichever iPhone is connected."""
+    objs = bus.call_sync(
+        "org.bluez", "/", "org.freedesktop.DBus.ObjectManager",
+        "GetManagedObjects", None, GLib.VariantType("(a{oa{sa{sv}}})"),
+        Gio.DBusCallFlags.NONE, 5000, None,
+    ).unpack()[0]
+
+    service_paths = [
+        path for path, ifaces in objs.items()
+        if str(ifaces.get("org.bluez.GattService1", {})
+               .get("UUID", "")).lower() == AMS_SERVICE
+    ]
+    found = {}
+    for svc in service_paths:
+        for path, ifaces in objs.items():
+            char = ifaces.get("org.bluez.GattCharacteristic1")
+            if not char or not path.startswith(svc + "/"):
+                continue
+            found[str(char.get("UUID", "")).lower()] = path
+    return found
+
+
+def write_char(bus, path, payload):
+    bus.call_sync(
+        "org.bluez", path, "org.bluez.GattCharacteristic1", "WriteValue",
+        GLib.Variant("(aya{sv})", (payload, {})),
+        None, Gio.DBusCallFlags.NONE, 5000, None,
+    )
+
+
+def cmd_command(args):
+    code = COMMANDS.get(args.name)
+    if code is None:
+        emit({"type": "error", "message": "unknown command: " + args.name})
+        return 1
+    bus = system_bus()
+    chars = find_chars(bus)
+    path = chars.get(CHAR_REMOTE_COMMAND)
+    if not path:
+        emit({"type": "error", "message": "AMS not available (phone connected?)"})
+        return 1
+    try:
+        write_char(bus, path, [code])
+    except GLib.Error as err:
+        emit({"type": "error", "message": str(err)})
+        return 1
+    return 0
+
+
+def cmd_listen(args):
+    bus = system_bus()
+    chars = find_chars(bus)
+    update_path = chars.get(CHAR_ENTITY_UPDATE)
+    if not update_path:
+        emit({"type": "status", "available": False})
+        # Nothing to listen to; exit non-zero so the caller can retry later.
+        return 1
+
+    state = {"title": "", "artist": "", "album": "", "duration": 0.0,
+             "player": "", "playback": "", "elapsed": 0.0, "volume": -1.0}
+
+    def push():
+        out = {"type": "nowplaying"}
+        out.update(state)
+        emit(out)
+
+    def on_value(value):
+        # Notification layout: entity id, attribute id, flags, then UTF-8.
+        if len(value) < 3:
+            return
+        entity, attribute, _flags = value[0], value[1], value[2]
+        try:
+            text = bytes(value[3:]).decode("utf-8", "replace")
+        except Exception:
+            return
+
+        if entity == ENTITY_TRACK:
+            key = TRACK_KEYS.get(attribute)
+            if key == "duration":
+                try:
+                    state["duration"] = float(text)
+                except ValueError:
+                    state["duration"] = 0.0
+            elif key:
+                state[key] = text
+            push()
+        elif entity == ENTITY_PLAYER:
+            if attribute == PLAYER_NAME:
+                state["player"] = text
+            elif attribute == PLAYER_VOLUME:
+                try:
+                    state["volume"] = float(text)
+                except ValueError:
+                    pass
+            elif attribute == PLAYER_PLAYBACK_INFO:
+                # "state,rate,elapsed"
+                parts = text.split(",")
+                if parts and parts[0].isdigit():
+                    state["playback"] = PLAYBACK_STATES.get(int(parts[0]), "")
+                if len(parts) > 2:
+                    try:
+                        state["elapsed"] = float(parts[2])
+                    except ValueError:
+                        pass
+            push()
+
+    def on_props(_c, _sender, path, _iface, _signal, params, _data):
+        if path != update_path:
+            return
+        _name, changed, _inv = params.unpack()
+        if "Value" in changed:
+            on_value(list(changed["Value"]))
+
+    bus.signal_subscribe(
+        "org.bluez", "org.freedesktop.DBus.Properties", "PropertiesChanged",
+        update_path, None, Gio.DBusSignalFlags.NONE, on_props, None,
+    )
+
+    try:
+        bus.call_sync(
+            "org.bluez", update_path, "org.bluez.GattCharacteristic1",
+            "StartNotify", None, None, Gio.DBusCallFlags.NONE, 5000, None,
+        )
+    except GLib.Error as err:
+        if "Already" not in str(err):
+            emit({"type": "error", "message": "StartNotify: " + str(err)})
+            return 1
+
+    # Registering the entities we want is what makes the phone start sending.
+    for entity, attributes in SUBSCRIPTIONS:
+        try:
+            write_char(bus, update_path, [entity] + attributes)
+        except GLib.Error as err:
+            emit({"type": "error", "message": "subscribe: " + str(err)})
+
+    emit({"type": "status", "available": True})
+    GLib.MainLoop().run()
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    sub = parser.add_subparsers(dest="cmd")
+    sub.add_parser("listen").set_defaults(func=cmd_listen)
+    p = sub.add_parser("command")
+    p.add_argument("name")
+    p.set_defaults(func=cmd_command)
+    args = parser.parse_args()
+    if not getattr(args, "func", None):
+        args = parser.parse_args(["listen"])
+    sys.exit(args.func(args) or 0)
+
+
+if __name__ == "__main__":
+    main()

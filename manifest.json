@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.kbbahapro.iphone",
+  "name": "iPhone",
+  "version": "1.0.0",
+  "author": "kbbahaPro",
+  "license": "MIT",
+  "description": "Mirror iPhone notifications, now playing, and battery into the Omarchy bar over Bluetooth LE, using Apple's ANCS and AMS. Dismiss from the desktop, auto-copy 2FA codes, and focus mode.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "iPhone",
+    "description": "iPhone notifications in the bar: unread badge, scrollable history, and dismiss straight from the desktop.",
+    "category": "Devices",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "historyLimit": 200,
+      "showToasts": true,
+      "mutedApps": "",
+      "advertiseName": "Omarchy",
+      "vipApps": "",
+      "autoCopyCodes": true
+    },
+    "schema": [
+      {
+        "key": "autoCopyCodes",
+        "type": "boolean",
+        "label": "Auto-copy login codes",
+        "defaultValue": true,
+        "description": "Pull 2FA/OTP codes out of notifications and put them straight on the clipboard."
+      },
+      {
+        "key": "vipApps",
+        "type": "string",
+        "label": "VIPs (allowed to interrupt focus)",
+        "defaultValue": "",
+        "description": "Comma-separated apps or sender names that still pop a toast in focus mode. Example: slack, mail, mom, acme"
+      },
+      {
+        "key": "showToasts",
+        "type": "boolean",
+        "label": "Show desktop popups",
+        "defaultValue": true,
+        "description": "Raise a normal desktop notification for each iPhone notification. Do Not Disturb still applies."
+      },
+      {
+        "key": "mutedApps",
+        "type": "string",
+        "label": "Silenced apps",
+        "defaultValue": "",
+        "description": "Comma-separated app names or bundle ids that should never pop a toast. They still appear in the panel. Example: games, com.apple.news"
+      },
+      {
+        "key": "historyLimit",
+        "type": "integer",
+        "label": "Notifications kept",
+        "min": 10,
+        "max": 2000,
+        "step": 10,
+        "defaultValue": 200,
+        "description": "How many notifications to keep in the panel and on disk."
+      },
+      {
+        "key": "advertiseName",
+        "type": "string",
+        "label": "Pairing name",
+        "defaultValue": "Omarchy",
+        "description": "The name this machine shows under Bluetooth on your iPhone while pairing."
+      }
+    ]
+  },
+  "homepage": "https://github.com/kbbahaPro/omarchy-iphone"
+}
