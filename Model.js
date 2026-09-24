@@ -283,9 +283,12 @@ function phonePending(items) {
 
 function isActionable(entry, currentSession) {
   if (!entry) return false
+  var current = Number(currentSession || 0)
+  // Nothing seen this connection yet, so there is nothing to compare against.
+  // Allow it: this also covers installs without the metadata patch.
+  if (current === 0) return true
   var s = Number(entry.session || 0)
-  // Sessions are unknown on installs without the metadata patch; allow the
-  // action there rather than disabling the buttons outright.
-  if (s === 0 || !currentSession) return true
-  return s === Number(currentSession)
+  // Stored before session tracking existed, which means an older connection.
+  if (s === 0) return false
+  return s === current
 }
