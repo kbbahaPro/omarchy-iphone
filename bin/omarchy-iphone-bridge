@@ -296,6 +296,24 @@ def cmd_listen(args):
 # --------------------------------------------------------------------------
 
 
+# ANCS answers the control point with its own error codes. Without this
+# mapping the user just sees a raw ATT number.
+ANCS_ERRORS = {
+    "0xa0": "The phone did not understand the command",
+    "0xa1": "The phone rejected the command",
+    "0xa2": "That notification is no longer on the phone",
+    "0xa3": "The phone could not perform that action",
+}
+
+
+def explain_att_error(text):
+    lowered = str(text).lower()
+    for code, message in ANCS_ERRORS.items():
+        if code in lowered:
+            return message
+    return None
+
+
 def action_log(text):
     """Append to a log, so a failed action can be diagnosed after the fact.
 
@@ -336,7 +354,7 @@ def cmd_invoke(args):
         action_log("  InvokeDeviceAction returned OK")
     except GLib.Error as err:
         action_log("  InvokeDeviceAction FAILED: %s" % err)
-        emit({"type": "error", "message": str(err)})
+        emit({"type": "error", "message": explain_att_error(err) or str(err)})
         return 1
     return 0
 

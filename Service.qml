@@ -324,19 +324,18 @@ Item {
     items = Model.removeById(items, -1)
   }
 
+  // Neither of these hides the card. A successful action makes the phone
+  // withdraw the notification, which closes it through the normal dismissal
+  // path; a failed one leaves the card up with the reason on it, instead of
+  // vanishing as though it had worked.
   function answerCall() {
     var c = activeCall
-    if (!c) return
-    if (!invoke(c, "positive")) return
-    _handledCallId = c.id
+    if (c) invoke(c, "positive")
   }
 
   function declineCall() {
     var c = activeCall
-    if (!c) return
-    if (!invoke(c, "negative")) return
-    _handledCallId = c.id
-    items = Model.removeById(items, c.id)
+    if (c) invoke(c, "negative")
   }
 
   function setFocus(on) {
@@ -540,6 +539,8 @@ Item {
     id: actionProcess
     running: false
     command: []
+    // handleLine turns an {"type":"error"} line into lastError, which the call
+    // card and the panel both surface.
     stdout: SplitParser { onRead: function (line) { root.handleLine(line) } }
     stderr: SplitParser {
       onRead: function (line) {
