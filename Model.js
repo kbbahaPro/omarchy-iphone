@@ -175,3 +175,49 @@ function isVip(entry, vipList) {
   }
   return false
 }
+
+// --- ANCS categories ----------------------------------------------------
+//
+// iOS tags every notification with a category. That is classification we get
+// for free, without asking the user to write rules.
+
+var CATEGORY = {
+  0: "Other",
+  1: "Incoming call",
+  2: "Missed call",
+  3: "Voicemail",
+  4: "Social",
+  5: "Schedule",
+  6: "Email",
+  7: "News",
+  8: "Health",
+  9: "Finance",
+  10: "Location",
+  11: "Entertainment"
+}
+
+function categoryLabel(entry) {
+  var id = Number(entry.category || 0)
+  return id === 0 ? "" : (CATEGORY[id] || "")
+}
+
+// Calls and voicemail deserve their own mark regardless of which app sent
+// them; everything else keeps the per-app glyph.
+function categoryGlyph(entry) {
+  var id = Number(entry.category || 0)
+  if (id === 1) return "\uf095"
+  if (id === 2) return "\uf095"
+  if (id === 3) return "\uf130"
+  return ""
+}
+
+function glyphFor(entry) {
+  return categoryGlyph(entry) || appGlyph(entry.appId, entry.appName)
+}
+
+// A call you missed is not something to find out about later, and iOS's own
+// "important" flag beats any list the user maintains by hand.
+function isUrgent(entry) {
+  var id = Number(entry.category || 0)
+  return entry.important === true || id === 1 || id === 2 || id === 3
+}

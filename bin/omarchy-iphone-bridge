@@ -18,6 +18,7 @@ Subcommands:
 """
 
 import argparse
+import datetime
 import json
 import os
 import sys
@@ -44,6 +45,18 @@ STATE_DIR = os.path.join(
 )
 HISTORY_PATH = os.path.join(STATE_DIR, "history.jsonl")
 DEFAULT_LIMIT = 200
+
+
+def ancs_date_to_epoch(text):
+    """ANCS sends the phone's own timestamp as yyyyMMdd'T'HHmmSS, local time.
+
+    That beats our arrival time, which drifts when the phone reconnects and
+    replays what it queued while away.
+    """
+    try:
+        return datetime.datetime.strptime(str(text), "%Y%m%dT%H%M%S").timestamp()
+    except (ValueError, TypeError):
+        return 0.0
 
 
 def emit(obj):
@@ -175,18 +188,27 @@ def cmd_listen(args):
             payload = json.loads(params.unpack()[0])
         except (ValueError, IndexError):
             return
+        # Prefer the phone's timestamp; fall back to arrival time.
+        stamp = ancs_date_to_epoch(payload.get("date")) or time.time()
         entry = {
             "type": "notification",
             "id": payload.get("id"),
             "appId": payload.get("app_id") or "",
             "appName": payload.get("app_name") or payload.get("app_id") or "Unknown",
             "title": payload.get("title") or "",
+            "subtitle": payload.get("subtitle") or "",
             "body": payload.get("body") or "",
             "deviceName": payload.get("device_name") or "",
             "deviceHandle": payload.get("device_handle") or "",
             "positiveAction": payload.get("positive_action"),
             "negativeAction": payload.get("negative_action"),
-            "ts": time.time(),
+            # iOS classifies every notification for us; no user rules needed.
+            "category": int(payload.get("category_id") or 0),
+            "categoryCount": int(payload.get("category_count") or 0),
+            "silent": payload.get("silent") is True,
+            "important": payload.get("important") is True,
+            "preexisting": payload.get("preexisting") is True,
+            "ts": stamp,
         }
         append_history(entry, limit)
         emit(entry)

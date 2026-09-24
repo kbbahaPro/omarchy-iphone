@@ -171,9 +171,14 @@ Item {
 
     if (!showToasts) return
     if (Model.isMuted(entry, mutedApps)) return
-    // In focus mode only the VIP list gets through; everything else still
-    // lands in the panel and the badge, just silently.
-    if (focusMode && !Model.isVip(entry, vipApps)) return
+    // iOS asked for this one to be delivered quietly. Honour it.
+    if (entry.silent === true) return
+    // Replayed from the phone's backlog on reconnect: worth showing in the
+    // panel, not worth a burst of popups for things that already happened.
+    if (entry.preexisting === true) return
+    // In focus mode only urgent notifications get through: calls, voicemail,
+    // anything iOS flagged important, plus the user's own VIP list.
+    if (focusMode && !Model.isUrgent(entry) && !Model.isVip(entry, vipApps)) return
     raiseToast(entry)
   }
 
@@ -208,11 +213,16 @@ Item {
     var appName = Model.displayAppName(entry)
     var title = String(entry.title || "").trim()
     var body = String(entry.body || "").trim()
-    if (title === "" && body === "") return
+    var label = Model.categoryLabel(entry)
+    if (title === "" && body === "") {
+      // A call with no text still matters, so fall back to the category.
+      if (label === "") return
+      title = label
+    }
     toastProcess.command = [
       "notify-send",
       "-a", appName + " · iPhone",
-      "-u", "normal",
+      "-u", Model.isUrgent(entry) ? "critical" : "normal",
       "--",
       title !== "" ? title : appName,
       body

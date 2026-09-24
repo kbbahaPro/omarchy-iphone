@@ -287,3 +287,27 @@ Set `vipApps` to a comma-separated list of apps or sender names, e.g.
 
 Login codes still come through in focus mode — you only ever see one because
 you just asked for it.
+
+---
+
+## What iOS tells us that ancs4linux discards
+
+ANCS carries more than the upstream daemon exposes. `patches/ancs4linux-metadata.patch`
+surfaces four things, and `install-ancs4linux.sh` applies it automatically:
+
+| Field | Why it matters |
+|---|---|
+| **Category** | iOS tags every notification: `Incoming call`, `Missed call`, `Voicemail`, `Social`, `Schedule`, `Email`, `News`, `Health`, `Finance`, `Location`, `Entertainment`. Classification with no user rules. |
+| **Important flag** | iOS's own urgency signal. Better than a hand-maintained VIP list, because Apple already did the work. |
+| **Silent flag** | iOS asked for quiet delivery. The plugin honours it and raises no popup. |
+| **Date** | The phone's timestamp rather than whenever the desktop received it. |
+
+Upstream also drops pre-existing notifications — the ones queued while the phone
+was out of range. The patch forwards them flagged as `preexisting`, so they
+appear in the panel as catch-up without firing a burst of popups.
+
+Calls, voicemail and anything iOS marked important are treated as urgent: they
+raise a `critical` toast and pierce focus mode without being on the VIP list.
+
+If the patch ever fails to apply against a newer ancs4linux, the installer says
+so and continues; the plugin degrades to the fields upstream provides.

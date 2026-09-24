@@ -29,6 +29,24 @@ echo "==> Installing for user: $TARGET_USER"
 echo "==> Installing runtime dependencies"
 pacman -S --needed --noconfirm python-dasbus python-typer python-gobject
 
+# ancs4linux discards metadata that ANCS actually sends: the notification
+# category, the Silent and Important flags, the subtitle, and the phone's own
+# timestamp. This patch surfaces them; without it the plugin still works, but
+# category routing and iOS's own urgency signal are unavailable.
+PATCH="$(dirname "$(readlink -f "$0")")/patches/ancs4linux-metadata.patch"
+if [ -f "$PATCH" ]; then
+  echo "==> Applying ANCS metadata patch"
+  if git -C "$SRC" apply --check "$PATCH" 2>/dev/null; then
+    git -C "$SRC" apply "$PATCH"
+    echo "    applied"
+  else
+    echo "    WARNING: patch did not apply cleanly against this ancs4linux revision."
+    echo "    Continuing without it; categories and iOS urgency flags will be unavailable."
+  fi
+else
+  echo "==> No metadata patch found, installing ancs4linux unmodified"
+fi
+
 echo "==> Installing ancs4linux to /opt/ancs4linux"
 rm -rf /opt/ancs4linux
 install -d /opt/ancs4linux

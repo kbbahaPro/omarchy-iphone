@@ -426,7 +426,7 @@ Panel {
 
                 Text {
                   Layout.alignment: Qt.AlignTop
-                  text: Model.appGlyph(row.modelData.appId, row.modelData.appName)
+                  text: Model.glyphFor(row.modelData)
                   color: root.foreground
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.icon
@@ -447,6 +447,15 @@ Panel {
                       font.family: root.fontFamily
                       font.pixelSize: Style.font.caption
                       font.bold: true
+                      textFormat: Text.PlainText
+                    }
+
+                    Text {
+                      visible: text !== ""
+                      text: Model.categoryLabel(row.modelData)
+                      color: Model.isUrgent(row.modelData) ? root.urgent : root.dim
+                      font.family: root.fontFamily
+                      font.pixelSize: Style.font.caption
                       textFormat: Text.PlainText
                     }
 
