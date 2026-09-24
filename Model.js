@@ -273,3 +273,19 @@ function phonePending(items) {
   for (var k in latest) total += latest[k]
   return total
 }
+
+// --- action validity ----------------------------------------------------
+//
+// ancs4linux assigns a random id base per connection, so a notification id
+// only means anything within the session it arrived in. Acting on an older
+// one writes a well-formed command referring to a notification the phone has
+// never heard of: it succeeds silently and does nothing.
+
+function isActionable(entry, currentSession) {
+  if (!entry) return false
+  var s = Number(entry.session || 0)
+  // Sessions are unknown on installs without the metadata patch; allow the
+  // action there rather than disabling the buttons outright.
+  if (s === 0 || !currentSession) return true
+  return s === Number(currentSession)
+}

@@ -38,6 +38,9 @@ Item {
   // protected without the fear of missing the one call that matters.
   // True once we have actually seen the phone, so a shell restart while the
   // phone is away can never trigger a lock on its own.
+  // The connection the newest notification belongs to; ids from earlier
+  // sessions can no longer be acted on.
+  property int currentSession: 0
   property bool _everConnected: false
   property bool focusMode: false
   property string lastCode: ""
@@ -186,6 +189,8 @@ Item {
     for (var i = 0; i < items.length; i++) {
       if (items[i].id === entry.id) { known = true; break }
     }
+    var session = Number(entry.session || 0)
+    if (session !== 0 && session !== currentSession) currentSession = session
     items = Model.upsert(items, entry, historyLimit)
     // An ANCS "modified" resend of a notification already on screen should
     // not bump the badge a second time.
@@ -312,6 +317,11 @@ Item {
 
   function invoke(entry, kind) {
     if (!entry || !entry.deviceHandle) return
+    if (!Model.isActionable(entry, currentSession)) {
+      // Fail loudly: the write would otherwise succeed and do nothing.
+      lastError = "Too old to act on — the phone reconnected since this arrived"
+      return
+    }
     var queue = _actionQueue.slice()
     queue.push([
       bridgePath, "invoke",
@@ -321,6 +331,18 @@ Item {
     ])
     _actionQueue = queue
     pumpActions()
+  }
+
+  // Exercised from IPC to prove whether the panel's action path reaches the
+  // phone, without needing a live call to click on.
+  function actOnNewest(kind) {
+    if (items.length === 0) return "no notifications"
+    var e = items[0]
+    if (!e.deviceHandle) return "entry has no deviceHandle"
+    lastError = ""
+    invoke(e, kind)
+    return "invoked " + kind + " on id=" + e.id + " app=" + e.appName
+           + " queue=" + _actionQueue.length + " running=" + actionProcess.running
   }
 
   function pumpActions() {

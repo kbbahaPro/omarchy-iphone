@@ -1,8 +1,8 @@
 diff --git i/ancs4linux/common/apis.py w/ancs4linux/common/apis.py
-index 9407ee4..bf51cbd 100644
+index 9407ee4..56c9562 100644
 --- i/ancs4linux/common/apis.py
 +++ w/ancs4linux/common/apis.py
-@@ -17,6 +17,15 @@ class ShowNotificationData:
+@@ -17,6 +17,19 @@ class ShowNotificationData:
      body: str
      positive_action: Optional[str]
      negative_action: Optional[str]
@@ -15,6 +15,10 @@ index 9407ee4..bf51cbd 100644
 +    silent: bool = False
 +    important: bool = False
 +    preexisting: bool = False
++    # Identifies the connection this notification belongs to. Notification ids
++    # are only meaningful within one connection, so an id from an earlier
++    # session cannot be acted on.
++    session: int = 0
  
      def json(self) -> str:
          return json.dumps(vars(self))
@@ -119,7 +123,7 @@ index d6e99a1..0c17d71 100644
  
  
 diff --git i/ancs4linux/observer/device_comm.py w/ancs4linux/observer/device_comm.py
-index 3e99676..eb507a2 100644
+index 3e99676..772af86 100644
 --- i/ancs4linux/observer/device_comm.py
 +++ w/ancs4linux/observer/device_comm.py
 @@ -27,6 +27,9 @@ class DeviceCommunicator:
@@ -157,7 +161,7 @@ index 3e99676..eb507a2 100644
          self.queue_notification(
              ShowNotificationData(
                  device_handle=self.device.path,
-@@ -83,6 +86,13 @@ class DeviceCommunicator:
+@@ -83,6 +86,14 @@ class DeviceCommunicator:
                  body=attrs.message,
                  positive_action=attrs.positive_action,
                  negative_action=attrs.negative_action,
@@ -168,6 +172,34 @@ index 3e99676..eb507a2 100644
 +                silent=meta.is_silent() if meta else False,
 +                important=meta.is_important() if meta else False,
 +                preexisting=meta.is_preexisting() if meta else False,
++                session=self.id,
              )
          )
          self.process_queue()
+diff --git i/ancs4linux/observer/server.py w/ancs4linux/observer/server.py
+index e5388dd..221139d 100644
+--- i/ancs4linux/observer/server.py
++++ w/ancs4linux/observer/server.py
+@@ -1,7 +1,11 @@
++import logging
++
+ from ancs4linux.common.apis import ObserverAPI
+ from ancs4linux.common.dbus import Bool, Str, UInt32, dbus_interface, dbus_signal
+ from ancs4linux.observer.scanner import Scanner
+ 
++log = logging.getLogger(__name__)
++
+ 
+ @dbus_interface(ObserverAPI.interface)
+ class ObserverServer(ObserverAPI):
+@@ -14,6 +18,10 @@ class ObserverServer(ObserverAPI):
+         if self.scanner is None:
+             return
+         if device_handle not in self.scanner.devices:
++            log.warning(
++                f"InvokeDeviceAction: unknown handle {device_handle}; "
++                f"known={list(self.scanner.devices)}"
++            )
+             return
+         self.scanner.devices[device_handle].handle_action(notification_id, is_positive)
+ 

@@ -97,6 +97,10 @@ Panel {
     function toggle(): void { root.toggle() }
     function pair(): string { iphone.startPairing(); return "advertising" }
     function focus(): string { iphone.toggleFocus(); return iphone.focusMode ? "on" : "off" }
+    // Diagnostic: run the exact action path the panel buttons use, against
+    // the newest notification, and report what the service saw.
+    function actNewest(): string { return iphone.actOnNewest("negative") }
+    function lastError(): string { return iphone.lastError }
     function focusOn(): string { iphone.setFocus(true); return "on" }
     function focusOff(): string { iphone.setFocus(false); return "off" }
     function clear(): string { iphone.clearAll(); return "ok" }
@@ -536,6 +540,7 @@ Panel {
                   Layout.alignment: Qt.AlignVCenter
                   visible: row.entry.positiveAction !== undefined
                            && row.entry.positiveAction !== null
+                           && Model.isActionable(row.entry, iphone.currentSession)
                   iconText: ""
                   tooltipText: String(row.entry.positiveAction || "Accept")
                   foreground: root.foreground
@@ -545,8 +550,13 @@ Panel {
 
                 PanelActionButton {
                   Layout.alignment: Qt.AlignVCenter
+                  // Stale rows keep a local-only dismiss; the phone cannot be
+                  // told about a notification from a previous connection.
+                  opacity: Model.isActionable(row.entry, iphone.currentSession) ? 1.0 : 0.45
+                  tooltipText: Model.isActionable(row.entry, iphone.currentSession)
+                               ? String(row.entry.negativeAction || "Dismiss on phone")
+                               : "Remove here only — too old to act on the phone"
                   iconText: ""
-                  tooltipText: String(row.entry.negativeAction || "Dismiss on phone")
                   foreground: root.foreground
                   hoverColor: root.urgent
                   fontFamily: root.fontFamily
